@@ -6,6 +6,8 @@ class UserModel(AbstractBaseUser):
     email = models.CharField(max_length=255, unique=True)
     password = models.CharField(max_length=1000)
     name = models.CharField(max_length=100)
+    otp = models.CharField(max_length=4, blank=True)
+    otp_verification = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
 

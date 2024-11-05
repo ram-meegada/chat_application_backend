@@ -155,3 +155,11 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+MAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+DEFAULT_FROM_EMAIL = "pythondevelopment06@gmail.com"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_HOST_USER = "pythondevelopment06@gmail.com"
+EMAIL_HOST_PASSWORD = "mhfowlbvuznqkhmc"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True

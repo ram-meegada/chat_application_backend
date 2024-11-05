@@ -7,6 +7,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password, make_password
 from .models import ChatSessionModel, ChatStorageModel
 from django.db.models import Q
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+import random
+from chat_application.settings import EMAIL_HOST_USER 
+from threading import Thread
 
 class SignUpView(APIView):
     permission_classes = [AllowAny]
@@ -28,14 +33,34 @@ class LoginView(APIView):
             password_verification = check_password(request.data['password'], user.password)
             if password_verification:
                 serializer = SignUpSerializer(user)
-                token = RefreshToken.for_user(user)
-                return Response({"data": serializer.data, "access_token": str(token.access_token), "message": "Login successfully", "status": 200}, status=200)
-            else:        
+                message = make_otp()
+                user.otp = message
+                user.save()
+                Thread(target=send_otp_via_mail, args=(user.email, user.name, message)).start()
+                return Response({"data": serializer.data, "message": "Login successfully", "status": 200}, status=200)
+            else:
                 return Response({"data": None, "message": "Invalid Password", "status": 400}, status=400)
         except UserModel.DoesNotExist:
             return Response({"data": None, "message": "User not found", "status": 400}, status=400)
         except Exception as err:
             return Response({"data": None, "message": "Something went wrong", "status": 400}, status=400)
+
+
+def make_otp():
+    otp = "".join(str(random.randint(0,9))for _ in range(4))
+    return otp
+
+def send_otp_via_mail(email, first_name, message):
+    name = first_name
+    context = {
+        "OTP": message,
+        "Name": name,
+    }
+    temp = render_to_string('otp.html', context)
+    msg = EmailMultiAlternatives("No Reply!", temp, EMAIL_HOST_USER, [email])
+    msg.content_subtype = 'html'
+    msg.send()
+    return message
 
 class UsersListingView(APIView):
     def get(self, request):
@@ -53,5 +78,30 @@ class MessagesListingView(APIView):
             chats = ChatStorageModel.objects.filter(session=session).values()
             # serializer = MessagesSerializer(chats, many=True)
             return Response({"data": chats, "message": "", "status": 200}, status=200)
+        except Exception as err:
+            return Response({"data": str(err), "message": "Something went wrong", "status": 400}, status=400)
+
+class OtpVerificationView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        try:
+            user = UserModel.objects.get(id=request.data["id"])
+            if user.otp == request.data["otp"]:
+                token = RefreshToken.for_user(user)
+                return Response({"data": None, "access_token": str(token.access_token), "message": "", "status": 200}, status=200)
+            return Response({"data": None, "message": "Wrong otp", "status": 400}, status=400)
+        except Exception as err:
+            return Response({"data": str(err), "message": "Something went wrong", "status": 400}, status=400)
+
+class ResendOtpView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        try:
+            user = UserModel.objects.get(id=request.data["id"])
+            message = make_otp()
+            user.otp = message
+            user.save()
+            Thread(target=send_otp_via_mail, args=(user.email, user.name, message)).start()
+            return Response({"data": None, "message": "", "status": 200}, status=200)
         except Exception as err:
             return Response({"data": str(err), "message": "Something went wrong", "status": 400}, status=400)
